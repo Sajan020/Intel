@@ -11,6 +11,7 @@ import os
 
 from corrosion_detector import CorrosionDetector
 from report_generator import ReportGenerator
+from enhanced_report_generator import enhanced_report_generator
 from utils import ImageProcessor, format_confidence
 from analytics_dashboard import AnalyticsDashboard
 from database import DatabaseManager, init_database
@@ -427,45 +428,106 @@ def render_reports_page():
         include_gis = st.checkbox("Include GIS Mapping", value=True)
     
     if st.button("📄 Generate Industrial Report", type="primary"):
-        st.success("Industrial report generated successfully!")
-        
-        # Show sample report preview
-        st.subheader("Report Preview")
-        
-        report_preview = f"""
-        **{report_type}**
-        
-        **Executive Summary:**
-        Pipeline integrity assessment completed for {len(pipeline_segments) if pipeline_segments else 'all'} segments.
-        AI-powered corrosion detection identified areas requiring attention.
-        
-        **Regulatory Compliance:**
-        - Report meets {', '.join(standards) if standards else 'applicable'} standards
-        - Inspection methodology approved for regulatory submission
-        - Documentation maintained per federal requirements
-        
-        **Key Findings:**
-        - Total inspection points analyzed: 156
-        - Corrosion areas detected: 23
-        - Critical priority items: 3
-        - Recommended actions: Immediate inspection of 3 locations
-        
-        **Next Steps:**
-        - Schedule field verification within 30 days
-        - Update integrity management program
-        - Plan corrective maintenance activities
-        """
-        
-        st.text_area("Report Content", report_preview, height=300)
-        
-        # Download options
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.download_button("📥 Download PDF", "sample_report.pdf", "application/pdf")
-        with col2:
-            st.download_button("📊 Download Excel", "sample_data.xlsx", "application/xlsx")
-        with col3:
-            st.download_button("📋 Download Word", "sample_report.docx", "application/docx")
+        with st.spinner("Generating professional report files..."):
+            # Prepare report data
+            report_data = {
+                'report_type': report_type,
+                'inspector_name': inspector,
+                'location': ', '.join(pipeline_segments) if pipeline_segments else 'Multiple Segments',
+                'inspection_date': datetime.now().strftime('%Y-%m-%d'),
+                'pipeline_type': 'Multi-Environment',
+                'total_detections': 23,  # Sample data
+                'avg_confidence': 0.875,
+                'severity_counts': {'Critical': 3, 'High': 7, 'Medium': 8, 'Low': 5},
+                'detections': [
+                    {
+                        'id': 1,
+                        'bbox': [150, 200, 80, 60],
+                        'area': 4800,
+                        'confidence': 0.92,
+                        'severity': 'Critical',
+                        'risk_assessment': 'Immediate action required'
+                    },
+                    {
+                        'id': 2,
+                        'bbox': [300, 150, 60, 45],
+                        'area': 2700,
+                        'confidence': 0.85,
+                        'severity': 'High',
+                        'risk_assessment': 'Schedule maintenance within 30 days'
+                    },
+                    {
+                        'id': 3,
+                        'bbox': [450, 350, 40, 55],
+                        'area': 2200,
+                        'confidence': 0.78,
+                        'severity': 'Medium',
+                        'risk_assessment': 'Monitor and schedule maintenance within 90 days'
+                    }
+                ]
+            }
+            
+            # Generate all report formats
+            try:
+                pdf_data = enhanced_report_generator.generate_pdf_report(report_data)
+                excel_data = enhanced_report_generator.generate_excel_report(report_data)
+                word_data = enhanced_report_generator.generate_word_report(report_data)
+                
+                st.success("✅ Professional reports generated successfully!")
+                
+                # Show report summary
+                st.subheader("📋 Report Summary")
+                col_summary1, col_summary2, col_summary3 = st.columns(3)
+                
+                with col_summary1:
+                    st.metric("Total Detections", report_data['total_detections'])
+                with col_summary2:
+                    st.metric("Average Confidence", f"{report_data['avg_confidence']:.1%}")
+                with col_summary3:
+                    st.metric("Critical Issues", report_data['severity_counts']['Critical'])
+                
+                st.subheader("📥 Download Professional Reports")
+                
+                # Create filename with timestamp
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                location_clean = ''.join(e for e in (', '.join(pipeline_segments) if pipeline_segments else 'Pipeline_Report') if e.isalnum() or e in ' -_').replace(' ', '_')
+                
+                # Download buttons with actual file data
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.download_button(
+                        label="📑 Download PDF Report",
+                        data=pdf_data,
+                        file_name=f"Pipeline_Corrosion_Report_{location_clean}_{timestamp}.pdf",
+                        mime="application/pdf",
+                        help="Professional PDF report for regulatory submission"
+                    )
+                
+                with col2:
+                    st.download_button(
+                        label="📊 Download Excel Data",
+                        data=excel_data,
+                        file_name=f"Pipeline_Analysis_Data_{location_clean}_{timestamp}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        help="Detailed Excel spreadsheet with all inspection data"
+                    )
+                
+                with col3:
+                    st.download_button(
+                        label="📝 Download Word Report",
+                        data=word_data,
+                        file_name=f"Pipeline_Inspection_Report_{location_clean}_{timestamp}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        help="Editable Word document for further customization"
+                    )
+                
+                # Report features
+                st.info("📋 **Report Features:** Professional formatting, regulatory compliance sections, detailed findings tables, risk assessments, and maintenance recommendations. All files are fully compatible with standard office software.")
+                
+            except Exception as e:
+                st.error(f"Error generating reports: {str(e)}")
+                st.info("Please try again or contact system administrator.")
 
 def render_settings_page():
     """Render system settings page"""
