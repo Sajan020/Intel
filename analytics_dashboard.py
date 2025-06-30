@@ -7,6 +7,7 @@ import folium
 from streamlit_folium import st_folium
 from datetime import datetime, timedelta
 from database import DatabaseManager
+from demo_data import demo_data
 import numpy as np
 
 class AnalyticsDashboard:
@@ -24,29 +25,26 @@ class AnalyticsDashboard:
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            # Total inspections this month
-            inspections = self.db_manager.get_inspection_history()
-            monthly_inspections = len([i for i in inspections 
-                                     if i['inspection_date'].month == datetime.now().month])
+            # Total inspections this month using demo data
+            monthly_inspections = demo_data.get_monthly_inspection_count()
             st.metric("Monthly Inspections", monthly_inspections)
         
         with col2:
-            # Critical alerts
-            alerts = self.db_manager.get_pending_alerts()
+            # Critical alerts using demo data
+            alerts = demo_data.get_pending_alerts()
             critical_alerts = len([a for a in alerts if a['severity'] == 'Critical'])
             st.metric("Critical Alerts", critical_alerts, delta=None if critical_alerts == 0 else f"+{critical_alerts}")
         
         with col3:
-            # Average detection confidence
-            if inspections:
-                avg_confidence = np.mean([i['avg_confidence'] for i in inspections if i['avg_confidence']])
-                st.metric("Avg Detection Confidence", f"{avg_confidence:.1%}")
-            else:
-                st.metric("Avg Detection Confidence", "N/A")
+            # Average detection confidence using demo data
+            summary = demo_data.get_detection_summary()
+            avg_confidence = summary['avg_confidence']
+            st.metric("Avg Detection Confidence", f"{avg_confidence:.1%}")
         
         with col4:
             # Pipeline segments monitored
-            st.metric("Pipeline Segments", "0", help="Add pipeline segments to track")
+            segments = demo_data.get_pipeline_segments()
+            st.metric("Pipeline Segments", len(segments), help="Active pipeline segments being monitored")
         
         # Charts Row
         col_left, col_right = st.columns(2)
@@ -136,16 +134,41 @@ class AnalyticsDashboard:
         """Render interactive pipeline map"""
         st.subheader("Pipeline Network Map")
         
-        # Create sample pipeline map
+        # Create pipeline map using demo data
         m = folium.Map(location=[29.7604, -95.3698], zoom_start=10)  # Houston area
         
-        # Sample pipeline segments with corrosion data
-        pipeline_segments = [
-            {"lat": 29.7604, "lon": -95.3698, "name": "Segment A", "status": "Critical", "detections": 8},
-            {"lat": 29.7804, "lon": -95.3498, "name": "Segment B", "status": "Good", "detections": 0},
-            {"lat": 29.7404, "lon": -95.3898, "name": "Segment C", "status": "Medium", "detections": 3},
-            {"lat": 29.7704, "lon": -95.3598, "name": "Segment D", "status": "High", "detections": 5},
-        ]
+        # Get pipeline segments from demo data
+        segments = demo_data.get_pipeline_segments()
+        inspections = demo_data.get_inspection_history()
+        
+        # Create pipeline segments with recent inspection data
+        pipeline_segments = []
+        for segment in segments:
+            # Get recent inspections for this segment
+            segment_inspections = [i for i in inspections if i['segment_id'] == segment['id']]
+            recent_inspection = max(segment_inspections, key=lambda x: x['inspection_date']) if segment_inspections else None
+            
+            if recent_inspection:
+                detections = recent_inspection['total_detections']
+                if recent_inspection['max_severity'] == 'Critical':
+                    status = "Critical"
+                elif recent_inspection['max_severity'] == 'High':
+                    status = "High"
+                elif recent_inspection['max_severity'] == 'Medium':
+                    status = "Medium"
+                else:
+                    status = "Good"
+            else:
+                detections = 0
+                status = "Good"
+            
+            pipeline_segments.append({
+                "lat": segment['latitude'],
+                "lon": segment['longitude'],
+                "name": segment['segment_name'],
+                "status": status,
+                "detections": detections
+            })
         
         # Color mapping for status
         color_map = {
@@ -187,19 +210,37 @@ class AnalyticsDashboard:
         """Render system alerts panel"""
         st.subheader("🚨 System Alerts")
         
-        # Sample alerts
-        alerts = [
-            {"type": "Critical Corrosion", "message": "Segment A: 8 critical detections", "time": "2 hours ago"},
-            {"type": "Maintenance Due", "message": "Segment C: Inspection overdue", "time": "1 day ago"},
-            {"type": "Threshold Exceeded", "message": "Segment D: High corrosion rate", "time": "3 days ago"},
-        ]
+        # Get alerts from demo data
+        alerts = demo_data.get_pending_alerts()[:5]  # Show top 5 alerts
         
+        # Convert to display format
+        display_alerts = []
         for alert in alerts:
+            time_diff = datetime.now() - alert['created_at']
+            if time_diff.days > 0:
+                time_str = f"{time_diff.days} day{'s' if time_diff.days > 1 else ''} ago"
+            elif time_diff.seconds > 3600:
+                hours = time_diff.seconds // 3600
+                time_str = f"{hours} hour{'s' if hours > 1 else ''} ago"
+            else:
+                minutes = time_diff.seconds // 60
+                time_str = f"{minutes} minute{'s' if minutes > 1 else ''} ago"
+            
+            display_alerts.append({
+                "type": alert['alert_type'],
+                "message": alert['message'],
+                "time": time_str,
+                "severity": alert['severity']
+            })
+        
+        for alert in display_alerts:
             with st.container():
-                if alert["type"] == "Critical Corrosion":
+                if alert["severity"] == "Critical":
                     st.error(f"🔴 **{alert['type']}**")
-                elif alert["type"] == "Maintenance Due":
+                elif alert["severity"] == "High":
                     st.warning(f"🟡 **{alert['type']}**")
+                elif alert["severity"] == "Medium":
+                    st.warning(f"🟠 **{alert['type']}**")
                 else:
                     st.info(f"🔵 **{alert['type']}**")
                 
