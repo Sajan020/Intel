@@ -86,7 +86,7 @@ def main():
             st.session_state.original_image = image
             
             st.subheader("Original Image")
-            st.image(image, caption=f"Uploaded: {uploaded_file.name}", use_column_width=True)
+            st.image(image, caption=f"Uploaded: {uploaded_file.name}", use_container_width=True)
             
             # Image info
             st.markdown(f"**Image Details:**")
@@ -126,10 +126,16 @@ def main():
             # Display processed image
             st.subheader("Detected Corrosion Areas")
             processed_image_rgb = cv2.cvtColor(st.session_state.processed_image, cv2.COLOR_BGR2RGB)
-            st.image(processed_image_rgb, caption="Corrosion Detection Results", use_column_width=True)
+            st.image(processed_image_rgb, caption="Corrosion Detection Results", use_container_width=True)
             
             # Detection summary
             st.subheader("📊 Detection Summary")
+            
+            # Calculate severity counts
+            severity_counts = {}
+            for detection in results['detections']:
+                severity = detection['severity']
+                severity_counts[severity] = severity_counts.get(severity, 0) + 1
             
             col_summary1, col_summary2, col_summary3 = st.columns(3)
             
@@ -145,12 +151,6 @@ def main():
                     label="Avg. Confidence",
                     value=f"{avg_confidence:.1%}"
                 )
-            
-            with col_summary3:
-                severity_counts = {}
-                for detection in results['detections']:
-                    severity = detection['severity']
-                    severity_counts[severity] = severity_counts.get(severity, 0) + 1
                 
                 max_severity = "None"
                 if severity_counts:
@@ -215,6 +215,12 @@ def main():
             if st.button("📄 Generate Report", type="secondary"):
                 report_generator = ReportGenerator()
                 
+                # Recalculate severity counts for report
+                report_severity_counts = {}
+                for detection in results['detections']:
+                    severity = detection['severity']
+                    report_severity_counts[severity] = report_severity_counts.get(severity, 0) + 1
+                
                 report_data = {
                     'inspector_name': inspector_name,
                     'location': location,
@@ -225,7 +231,7 @@ def main():
                     'detections': results['detections'],
                     'total_detections': len(results['detections']),
                     'avg_confidence': np.mean([d['confidence'] for d in results['detections']]) if results['detections'] else 0,
-                    'severity_counts': severity_counts if 'severity_counts' in locals() else {}
+                    'severity_counts': report_severity_counts
                 }
                 
                 report_content = report_generator.generate_report(report_data)

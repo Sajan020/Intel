@@ -117,6 +117,7 @@ The application is built with Streamlit for the web interface and leverages Open
 ```
 Changelog:
 - June 30, 2025. Initial setup
+- June 30, 2025. Fixed deprecated Streamlit parameters (use_column_width → use_container_width)
 ```
 
 ## User Preferences
